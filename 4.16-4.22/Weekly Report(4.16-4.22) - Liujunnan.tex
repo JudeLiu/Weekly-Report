@@ -7,8 +7,16 @@
 \usepackage{amsmath}
 \usepackage{multirow,array}
 \usepackage{listings}
+\usepackage{amsfonts}
+\usepackage{caption}
+\usepackage{subfigure}
+\usepackage{algorithm,algorithmic}
+
 %\documentstyle[nips14submit_09,times,art10]{article} % For LaTeX 2.09
 %\usepackage{fontspec}
+
+\renewcommand{\algorithmicrequire}{ \textbf{Input:}} %Use Input in the format of Algorithm
+\renewcommand{\algorithmicensure}{ \textbf{Output:}} %UseOutput in the format of Algorithm  
 
 \definecolor{mygreen}{rgb}{0,0.6,0}
 \definecolor{mygray}{rgb}{0.5,0.5,0.5}
@@ -49,7 +57,7 @@ ljnsjtu@hotmail.com
 \newcommand{\fix}{\marginpar{FIX}}
 \newcommand{\new}{\marginpar{NEW}}
 
-\nipsfinalcopy % Uncomment for camera-ready version
+%\nipsfinalcopy % Uncomment for camera-ready version
 
 \begin{document}
 
@@ -57,14 +65,14 @@ ljnsjtu@hotmail.com
 \maketitle
 
 \begin{abstract}
-
+This report is focused on the work I have done this week. Generally I will talk about neural network, clustering algorithms and recommender systems along with some experiments and details.
 \end{abstract}
 
 \section{Work Done}
-This week I continued to learn machine learning course, including neural network, support vector machine, clustering algorithms and recommender system.
+This week I continued to learn machine learning course, including neural network, clustering algorithms and recommender systems.
 
 \subsection{Neural Network Contd.}
-A basic neural network model is shown in Fig. \ref{fig:nnmodel}. The course required to implement neural network algorithm, including forward and back propagation processes. Although the implementation was not quite difficult given detailed instructions, a wide-used trick -- vectorization was worth mentioning.
+A basic neural network model is shown in Fig. \ref{fig:nnmodel}. The course requires to implement neural network algorithm, including forward and back propagation processes. Although the implementation is not quite difficult given detailed instructions, a widely used trick -- vectorization is worth mentioning.
 
 \begin{figure}[h]
 %\centering
@@ -83,7 +91,7 @@ A neural network usually uses cross entropy loss function
 
 $$J(\theta) = \frac{1}{m} \sum_{i=1}^m \sum_{k=1}^K \left[ -y_k^{(i)}\log((h_\theta(x^{(i)}))_k) + (1 - y_k^{(i)})\log(1 - h_\theta(x^{(i)})_k) \right]$$
 
-One way to implement it is using two for-loops
+One method is using two for-loops
 \begin{lstlisting}[language=matlab]
 for i=1:m
 	for j=1:num_labels
@@ -93,18 +101,18 @@ end
 J = J / m;
 \end{lstlisting}
 
-If using vectorization, the loops can be shortened as one line
+If we use matrix computation instead of element-wise computation, the code can be shortened as one line
 
 \begin{lstlisting}[language=matlab]
 J = 1/m * sum(sum(-yVec .* log(a3) - (1 - yVec) .* log(1 - a3)));
 \end{lstlisting}
 
-Then we can use built-in timing commands tic and toc to measure the time cost. After running these part of code for 4 times, the average time interval of for-loop is $t_l = 0.004469s$, while that of vectorization is $t_v=0.002440s$, showing that $t_v/t_l=0.546$, meaning almost half of the time saved.
+Then we can use built-in timing commands tic and toc to measure the time cost. After running these part of code for 4 times, the average time interval of for-loop is $t_l = 0.004469s$, while that of vectorization is $t_v=0.002440s$, showing that $t_v/t_l=0.546$, almost half of the time saved.
 
 Although it is just a simple experiment that compares the time cost between with or without vectorization, the result strongly suggests that we should apply vectorization wherever possible, since Matlab or any other programming languages' matrix packages highly optimize the matrix computations.
 
 \subsection{Bias and Variance}
-A machine learning algorithm sometimes suffers from over-fitting and under-fitting(shown in Fig. \ref{fig:overfit}). If the number of features are large and number of training examples small, it can overfit. A very wide-used method to address overfitting problem is adding a regularization term into the cost function $J$(taking logistic regression as an example):
+A machine learning algorithm sometimes suffers from over-fitting and under-fitting(shown in Fig. \ref{fig:overfit}). If the number of features are large and number of training examples small, it can overfit. A widely used method to address overfitting problem is adding a regularization term into the cost function $J$. Let's take logistic regression as an example:
 $$J(\theta) = \frac{1}{m} \sum_{i=1}^m \sum_{k=1}^K \left[ -y_k^{(i)}\log((h_\theta(x^{(i)}))_k) + (1 - y_k^{(i)})\log(1 - h_\theta(x^{(i)})_k) \right] + \frac{\lambda}{2m}\sum_{j=1}^{m}\theta_j^2$$
 
 \begin{figure}[h]
@@ -114,7 +122,7 @@ $$J(\theta) = \frac{1}{m} \sum_{i=1}^m \sum_{k=1}^K \left[ -y_k^{(i)}\log((h_\th
   \label{fig:overfit}
 \end{figure}
 
-By changing the value of $\lambda$, the result will be different, maybe better or even worse. More concretely, given a set of examples with 2 features(shown in Fig. \ref{fig:training-data}), we want to train a logistic classifier to predict the type of a new data. After training the model, we can draw the decision boundary for visualization. If we don't use regularization technique($\lambda=0$), the decision boundary look like Fig. \ref{fig:lambda-0}. The curve looks quite twisted but well separates positives from negatives. Apparently this model won't generalize to upcoming data. If we set $\lambda$ as a very high value, it will cause underfitting(Fig. \ref{fig:lambda-100}), which can't separate the training data. To avoid those problems, we should try a series of different values of $\lambda$ and see how well it will be. In this case, $\lambda=1$ works just fine(Fig. \ref{fig:lambda-1}).
+By changing the value of $\lambda$, the result will be different, maybe better or even worse. More concretely, given a set of examples with 2 features(shown in Fig. \ref{fig:training-data}), we want to train a logistic classifier to predict the type of a new data. After training the model, we can draw the decision boundary for visualization. If we don't use regularization technique($\lambda=0$), the decision boundary looks like Fig. \ref{fig:lambda-0}. The curve looks quite twisted but well separates positives from negatives. Apparently this model won't generalize to upcoming data. On the contrary, if we set $\lambda$ as a very huge value, it will cause underfitting(Fig. \ref{fig:lambda-100}), which can't even separate the training data. To avoid these two problems, we should try a series of different values of $\lambda$ and find the best performance. In this case, $\lambda=1$ works just fine(Fig. \ref{fig:lambda-1}).
 
 \begin{figure}[h]
   \centering
@@ -147,7 +155,7 @@ By changing the value of $\lambda$, the result will be different, maybe better o
 \end{figure}
 
 \subsection{Error Metrics for Skewed Classes}
-In classification tasks, we usually use accuracy as the metric of our model. But sometimes skewed classes, or unbalanced classes problems will occur, meaning that the number of negative examples overwhelms that of positive ones. In such cases, accuracy is insufficient to measure the performance of the trained models. The confusion matrix is introduced to address this kind of problems, which is defined as follows:
+In classification tasks, we usually use accuracy as the metric of our model. But sometimes skewed classes, or unbalanced classes problems will occur, meaning that the number of negative examples overwhelms that of positive ones. In such cases, accuracy is insufficient to measure the performance of the trained models. Therefore, the confusion matrix is introduced to address this kind of problems, which is defined in Table \ref{tab:confusion-matrix}:
 
 \begin{table}[h]
   \centering
@@ -164,11 +172,52 @@ In classification tasks, we usually use accuracy as the metric of our model. But
   \caption{Confusion Matrix}\label{tab:confusion-matrix}
 \end{table}
 
-Then accuracy is given as $\frac{TP+TN}{TP+TN+FP+FN}$. Since it is insufficient, we define precision $p=\frac{TP}{TP+FP}$, and recall $r=\frac{TP}{TP+FN}$. By changing the value of threshold, we can get pairs of precision-recall and then draw a figure. If we want a real number to measure the performance, we have 
+Then accuracy is given as $\frac{TP+TN}{TP+TN+FP+FN}$. What's more, we define precision $p=\frac{TP}{TP+FP}$, and recall $r=\frac{TP}{TP+FN}$. By altering the value of threshold, we can get pairs of precision-recall and then draw a figure. If we want a real number to measure the performance, we have
 $$F_1 \text{ score} = \frac{2*p*r}{p+r}$$
 So we can compare different models with their $F_1$ scores accordingly, the more it is close to $1$, the better performance it has.
 
+\subsection{Unsupervised Learning}
+Contrary to supervised learning, the training data of unsupervised learning are not given specific labels, but we still want to partition them into several groups out of certain purpose. K-means algorithm is a typical clustering algorithm that solves the problem above, which is given in Algorithm\ref{alg:k-means},
+\begin{algorithm}[H]
+  \caption{K-means algorithm}
+  \label{alg:k-means}
+  \hspace*{0.02in} {\textbf{Input:} number of clusters $K$, $m$ training examples $\{x^{(1)}, x^{(1)}, \dots, x^{(m)}\}$} %算法的输入， \hspace*{0.02in}用来控制位置，同时利用 \\ 进行换行
+  \begin{algorithmic}[1]
+  \STATE Randomly initialize $K$ cluster centroids $\mu_1,\mu_2,\dots,\mu_K \in \mathbb{R}^n$\\
+  \REPEAT 
+    \FOR{$i=1$ to $m$}
+        \STATE $c^{(i)}:=$ index of cluster centroid closest to $x^{(i)}$\\
+    \ENDFOR
+    \FOR{$k=1$ to $K$}
+        \STATE $\mu_k:=$ mean of points assigned to cluster $k$
+    \ENDFOR
+  \UNTIL{converge}
+  \end{algorithmic}
+\end{algorithm}
+
+K-means is an iterative algorithm, and the result is related to the initial values assigned to cluster centroids $\mu_1,\mu_2,\dots,\mu_K$. Sometimes different initial values will give totally different results(Shown in Fig. \ref{fig:k-means-init}). To solve this problem, we can run multiple times of K means algorithm with different initialization settings, and choose the best one.
+
+\begin{figure}[h]
+    \subfigure[good]{
+        \begin{minipage}{7cm}
+        \centering
+        \includegraphics[width=2.2in]{good-init.png}
+        \end{minipage}
+    }
+    \subfigure[bad]{
+        \begin{minipage}{7cm}
+        \centering
+        \includegraphics[width=2.2in]{bad-init.png}
+        \end{minipage}
+    }
+  \label{fig:k-means-init}
+  \caption{K-Means Initialization}
+\end{figure}
+
+\subsection{Recommender System}
+Recommender systems are widely applied machine learning algorithms. For instance, a moving rating website recommends some new movies that a user has not watched yet but he will probably like them as well. The web site can apply machine learning algorithms such as content-based recommender system and collaborative filtering to achieve this job. Content-based methods are based on descriptions of the item and a profile of the user's preferences. Collaborative filtering methods are based on collecting and analyzing a large amount of information on users’ preferences and predicting what users will like based on their similarity to other users. A key advantage of the collaborative filtering approach is that it is capable of accurately recommending complex items such as movies without requiring an ``understanding'' of the item itself.
 
 \section{Plans}
+In the next week I will finish machine learning course and go on to the next step of training.
 
 \end{document}
