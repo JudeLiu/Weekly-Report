@@ -1,0 +1,132 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{nips15submit_e,times}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{multirow,array}
+\usepackage{listings}
+\usepackage{amsfonts}
+\usepackage{caption}
+\usepackage{subfigure}
+\usepackage{algorithm,algorithmic}
+
+%\documentstyle[nips14submit_09,times,art10]{article} % For LaTeX 2.09
+%\usepackage{fontspec}
+
+\renewcommand{\algorithmicrequire}{ \textbf{Input:}} %Use Input in the format of Algorithm
+\renewcommand{\algorithmicensure}{ \textbf{Output:}} %UseOutput in the format of Algorithm
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\lstset{ %
+backgroundcolor=\color{white},   % choose the background color
+basicstyle=\footnotesize\ttfamily,        % size of fonts used for the code
+columns=fullflexible,
+breaklines=true,                 % automatic line breaking only at whitespace
+captionpos=b,                    % sets the caption-position to bottom
+tabsize=4,
+commentstyle=\color{mygreen},    % comment style
+escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+keywordstyle=\color{blue},       % keyword style
+stringstyle=\color{mymauve}\ttfamily,     % string literal style
+frame=single,
+rulesepcolor=\color{red!20!green!20!blue!20},
+% identifierstyle=\color{red},
+language=c++,
+}
+
+\title{Weekly Report(Apr 23-Apr 29)}
+
+\author{
+Liu Junnan
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\nipsfinalcopy % Uncomment for camera-ready version
+
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+This week I started to learn computer vision on CS231n, and assignment 1 of the course.
+\end{abstract}
+
+\section{Work Done}
+\subsection{Computer Vision}
+This week I started CS231n course addressed by Fei Fei Li. Computer vision is an interesting and challenging field of computer science. The most information we get everyday is visual information, and we are so easy to recognize and analyze these information that we can't realize how hard it is for computers to understand visual data, since what computers actually get are just 3 dimensional matrices. What computer vision algorithms try to do is to apply machine learning algorithms to solve these problems.
+
+\subsection{K Nearest Neighbor Algorithm}
+CS231n again walks through the pipeline of machine learning task. The first assignment requires us to implement K-nearest neighbors algorithm. The principle of KNN is easy to understand. The training process is to memorize all the training data, and the predicting
+process is to compute all the distances between training set and the test data, and find the smallest k data, which are so-called k nearest neighbors. Although as simple as it is, there are still many tricks in implementation.
+
+\subsection{Implementation of KNN algorithm}
+The assignment asks us to implement KNN prediction function ,that is, computing distances among the test data and all the training data, in three different versions -- two loops, one loop, and no loop. The test data have shape (num\_test, D), where num\_test is the number of the test points, and D is the number of features of test and also training data. The training data have shape (num\_train, D). Therefore the distance matrix dist has shape (num\_test, num\_train). 
+
+The two loop version of implementation is quite straightforward. It just iterates all the test data and training data.
+\begin{lstlisting}[language=python]
+for i in range(num_test):
+    for j in range(num_train):
+        dists[i, j] = np.sqrt(np.sum((X[i, :] - self.X_train[j, :]) ** 2))
+\end{lstlisting}
+
+The one loop version just iterates test data, and computes the distances between this data and all the training data, with the help of broadcast feature of numpy.
+\begin{lstlisting}[language=python]
+for i in range(num_test):
+    dists[i, :] = np.sqrt(np.sum((X[i, :] - self.X_train)**2, axis=1))
+return dists
+\end{lstlisting}
+
+These two versions are not so difficult, but the no loop version demands full vectorized computation, which makes it much trickier to implement. To be honest I didn't figure it out, so I had to search the Internet and then found the solution, which makes good use of broadcast feature of numpy. The code is as follows:
+\begin{lstlisting}[language=python]
+P = np.sum(X**2, axis=1)
+Q = np.sum(self.X_train**2, axis=1)
+PQ = X.dot(self.X_train.T)
+dists = np.sqrt(np.transpose([P]) + Q - 2*PQ)
+\end{lstlisting}
+Let $p$ denotes test data matrix, $q$ training data matrix, and $dist$ distance matrix. The equation of distance is $(p-q)^2$. There is no way to just simple subtract test and training data and square the subtraction because they don't have the same shape. However, the solution applies the equation $(p\pm q)^2=p^2 \pm 2pq + q^2$, and the term $p^2$ and $q^2$ are easy to vectorize, the middle term $2pq$ is dot multiplication of two matrix, so it is also vectorized. But actually these three terms have totally different shapes. In code line 1 above, $P$ has shape (num\_test,) --- which in numpy indicates that this array has 1 dimension with size num\_test. Similarly, $Q$ has shape (num\_train,), and $PQ$ has shape (num\_test, num\_train). Here is the trick. if we compute $[P].T-Q$ instead, these two array will be broadcast, and yields result with shape (num\_test, num\_train).
+
+To further explain what happens, it is important to read and understand the rules of broadcasting. 
+\begin{itemize}
+\item When operating on two arrays, NumPy compares their shapes element-wise. It starts with the trailing dimensions, and works its way forward. Two dimensions are compatible when
+    \begin{enumerate}
+        \item they are equal, or
+        \item one of them is 1
+    \end{enumerate}
+\item Arrays do not need to have the same number of dimensions. When either of the dimensions compared is one, the other is used.  In other words, dimensions with size 1 are stretched or ¡°copied¡± to match the other.
+\end{itemize}
+
+Let check the rules. $P$ has shape (num\_test,), and we add brackets $[P]$ makes it a 2 dimensional array with shape (1, num\_test), and function np.transpose() transposes it yielding shape (num\_test, 1). Since $Q$ has shape (num\_train,), it matches the last dimension of the term np.transpose([P]), so the rule 1 of broadcasting is met; np.transpose([P]) has more dimensions than Q, so the rule 2 is met. Therefore the result finally has shape (num\_test, num\_train), which is the same as PQ, so they will do element-wise subtraction.
+
+The assignment then compare the time cost among these three versions of implementation. The result shows marvelous improvement that vectorization does.
+\begin{table}[h]
+\centering
+\begin{tabular}{c|c|c}
+\hline
+two loops & one loop & no loops\\
+\hline
+36.73 & 121.6 & 0.33\\
+\hline
+\end{tabular}
+\caption{Performance Compare}
+\end{table}
+This experiment again demonstrates the power of vectorization in matrix computation. We should definitely vectorize the code whenever possible.
+
+\section{Plans}
+In the next week I will finish assignment 1 of CS231n, and continue the course.
+
+\end{document}
