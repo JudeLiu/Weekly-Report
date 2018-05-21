@@ -40,7 +40,7 @@ language=python,
 numbers=left
 }
 
-\title{Weekly Report()}
+\title{Weekly Report(May 14 - May 20)}
 
 
 \author{
@@ -65,12 +65,11 @@ Liu Junnan
 \maketitle
 
 \begin{abstract}
-This week I finished assignment2 including the implementation of convolutional layer and \{batch, layer, spatial batch, group\}normalization layers, plus pytorch version of convnets. 
+This week I finished assignment2 including the implementation of convolutional layer and \{batch, layer, spatial batch, group\}normalization layers, plus pytorch version of convnets. This report covers the details in the implementation of these topic mentioned above. 
 \end{abstract}
 
 \section{Work Done}
-\subsection{Convolutional Neural Network - Implementation}
-\subsubsection{Conv Layer}
+\subsection{Convolutional Layer - Implementation}
 Recall that a convolutional layer consists of several filters that convolves input images and produces a feature map.
 \begin{figure}[H]
 	\centering
@@ -226,9 +225,10 @@ We do padding is due to the shape issue. In each element of the feature map/outp
 
 Again, backpropagation of conv layer is quite tricky. Even though I referred to many blogs and materials, I still don't think I fully understand the math behind it. But at least I can implement the code if the formulations are given. 
 
-\subsubsection{Normalization Layers - Implementation}
+\subsection{Normalization Layers - Implementation}
 I have already finished the naive version of batch normalization layer last week, but still remains improvement to do. Besides there are still several variants like layer normalization, spatial batch normalization and spatial group normalization.
 
+\subsubsection{Batch Normalization}
 Recall that batch normalization can be computed by the following equations:
 Forward:
 \begin{eqnarray*}
@@ -275,7 +275,7 @@ In the above equation
 $$\sum_i x_i - \mu = \sum_i x_i - \sum_i \mu =m*\mu - m * \mu=0$$
 Therefore $\nabla \mu = \frac{-1}{\sqrt{\sigma^2+\epsilon}} \cdot \sum_i \nabla \hat{x_i}$
 
-Assemble them together we can get $\nabla x_i$ as:
+Assemble them together we can get $\nabla \hat{x_i}$ as:
 \begin{eqnarray*}
 	\nabla \hat{x_i} &=& \left(\nabla \hat{x_i} \cdot \frac{1}{\sqrt{\sigma^2 + \epsilon}}\right) + \left(\nabla \sigma^2 \cdot \frac{2(x_i-\mu)}{m}\right) + \left(\frac{\nabla{\mu}}{m}\right)\\
 	&=& \left(\nabla \hat{x_i} \cdot \frac{1}{\sqrt{\sigma^2 + \epsilon}}\right) - \left(\frac{1}{2(\sigma^2+\epsilon)} \sum_j \nabla \hat{x_j} \hat{x_j} \cdot \frac{2(x_i-\mu)}{m}\right) + \left(\frac{-1}{m\sqrt{\sigma^2+\epsilon}} \cdot \sum_i \nabla \hat{x_i}\right)\\
@@ -287,12 +287,98 @@ The simplified version of backprop of batchnorm is given as:
 \begin{lstlisting}
 dbeta = np.sum(dout, axis=0)
 dx_hat = dout * gamma
-dx = var_inv / m * (dx_hat * m - dx_hat.sum(0) - x_hat * (dx_hat * x_hat).sum(0))
+dx = var_inv / m * (dx_hat * m - x_hat * (dx_hat * x_hat).sum(0) - dx_hat.sum(0))
 \end{lstlisting}
 
-In the experiment we can see the difference between naive version and simplified version is very close to zero, but simplified version is 2.17 times faster than naive one, which is a significant improvement because we insert batchnorm layers after each conv layer to accelerate the training procedure so we want the cost to be minimal.
+In the experiment we can see the difference between naive version and simplified version is small, but simplified version is 2.17 times faster than naive one, which is a significant improvement because we insert batchnorm layers after each conv layer to accelerate the training procedure, so we want the cost to be minimal.
 
+\subsubsection{Layer Normalization}
+Batch normalization has proved to be effective in making networks easier to train, but the dependency on batch size makes it less useful in complex networks which have a cap on the input batch size due to hardware limitations.
+
+Several alternatives to batch normalization have been proposed to mitigate this problem; one such technique is Layer Normalization. Instead of normalizing over the batch, we normalize over the features. In other words, when using Layer Normalization, each feature vector corresponding to a single datapoint is normalized based on the sum of all terms within that feature vector.
+
+The implementation is similar to batch normalization, and it only needs a slight modification to make it work. We simply compute mean and standard deviation over the feature dimensions and everything else remains untouched:
+\begin{lstlisting}
+mu = x.mean(1, keepdims=True)
+var = x.std(1, keepdims=True)
+var_inv = 1 / np.sqrt(var**2 + eps)
+x_hat = (x - mu) * var_inv
+out = gamma * x_hat + beta
+cache = (x_hat, mu, var_inv, gamma)
+\end{lstlisting}
+
+The backward pass of layer normalization is similar.
+
+\subsubsection{Spatial Batch Normalization}
+Normally batch-normalization accepts inputs of shape (N, D) and produces outputs of shape (N, D), where we normalize across the minibatch dimension N. For data coming from convolutional layers, batch normalization needs to accept inputs of shape (N, C, H, W) and produce outputs of shape (N, C, H, W) where the N dimension gives the minibatch size and the (H, W) dimensions give the spatial size of the feature map.
+
+If the feature map was produced using convolutions, then we expect the statistics of each feature channel to be relatively consistent both between different imagesand different locations within the same image. Therefore spatial batch normalization computes a mean and variance for each of the C feature channels by computing statistics over both the minibatch dimension N and the spatial dimensions H and W. We can transpose the 4 dimensional input matrix and reshape it to 2d vector to do the trick:
+\begin{lstlisting}
+N, C, H, W = x.shape
+x = x.transpose((0, 2, 3, 1)).reshape((-1, C))
+out, cache = batchnorm_forward(x, gamma, beta, bn_param)
+out = out.reshape((N, H, W, C)).transpose((0, 3, 1, 2))
+\end{lstlisting}
+np.transpose permutes the axes according to the order of the axes tuple given. And using the same trick we can implement the backward pass.
+
+\subsubsection{Spatial Group Normalization}
+Previously Layer Normalization serves as an alternative normalization technique that mitigates the batch size limitations of Batch Normalization. However, as the authors of layernorm observed, Layer Normalization does not perform as well as Batch Normalization when used with Convolutional Layers. Yuxin Wu and Kaiming He et al propose an intermediary technique. In contrast to Layer Normalization, where you normalize over the entire feature per-datapoint, they suggest a consistent splitting of each per-datapoint feature into G groups, and a per-group per-datapoint normalization instead. Fig\ref{fig:norm} demonstrates the intuitive idea of spatial group normalization.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.7\textwidth]{normalization.png}
+	\caption{Visual comparison of the normalization techniques discussed so far}
+	\label{fig:norm}
+\end{figure}
+
+To implement group normalization, we have to take good care of the dimensions but the basic idea is still similar to batch normalization:
+
+\begin{lstlisting}
+N, C, H, W = x.shape
+x = x.reshape((N, G, -1))
+mu = np.mean(x, 2, keepdims=True)
+var = np.std(x, 2, keepdims=True)
+var_inv = 1 / np.sqrt(var**2 + eps)
+
+x_hat = (x - mu) * var_inv
+x_hat = x_hat.reshape((N, C, H, W))
+x = x.reshape((N, C, H, W))
+out = gamma * x_hat + beta
+\end{lstlisting}
+
+We can perform backward pass with the similar idea:
+\begin{lstlisting}
+N, C, H, W = dout.shape
+grouped_shape = (N, G, -1)
+m = C//G * H * W
+
+dgamma = np.sum(x_hat * dout, axis=(0, 2, 3), keepdims=True)
+dbeta = np.sum(dout, axis=(0, 2, 3), keepdims=True)
+
+dx_hat = dout * gamma
+dx_hat = dx_hat.reshape(grouped_shape)
+x_hat = x_hat.reshape(grouped_shape)
+dx = var_inv / m * \
+(dx_hat * m - dx_hat.sum(2, keepdims=True) - x_hat * np.sum(dx_hat * x_hat, axis=2, keepdims=True))
+dx = dx.reshape((N, C, H, W))
+\end{lstlisting}
+
+\subsection{Training Convolutional Network with PyTorch}
+Assignment 2 requires us to implement convnet with PyTorch on different levels of abstractions, which will help us to understand it better.
+
+\paragraph{Barebones PyTorch}
+In this part we should use basic PyTorch functions to implement a three-layered convolutional network of two conv layers with ReLU activation and a fully-connected layer, where torch.nn.functional.relu serves as ReLU nonlinearity, torch.nn.functional.conv2d as conv layers, and matrix multiplication as FC layer. Functions in torch.nn.functional need specific data and weighted parameters as the input, which means the abstraction level and convenience are low but flexibility is high. The gradients can be automatically computed by PyTorch with the autograd feature, which is quite awesome, but we have to manually update the parameters.
+
+\paragraph{PyTorch Module API}
+Barebone PyTorch requires that we track all the parameter tensors by hand. This is fine for small networks with a few tensors, but it would be extremely inconvenient and error-prone to track tens or hundreds of tensors in larger networks. PyTorch provides the nn.Module API for users to define arbitrary network architectures, while tracking every learnable parameters for us. In the previous part, we implemented SGD ourselves. PyTorch also provides the torch.optim package that implements all the common optimizers, such as RMSProp, Adagrad, and Adam. For example, we can define a convolutional layer using torch.nn.Conv2d fed with parameters that define the shape of the conv layer such as the input channels, filter numbers and filter shapes, but input data are not needed and weights are wrapped up inside the module. PyTorch module API provides higher abstraction and convenience than barebones PyTorch, but less flexibility.
+
+\paragraph{PyTorch Sequential API}
+For simple models like a stack of feed forward layers, we still need to go through 3 steps: subclass nn.Module, assign layers to class attributes in \_\_init\_\_, and call each layer one by one in forward(). PyTorch provides a container Module called nn.Sequential, which merges the above steps into one. It is not as flexible as nn.Module, because you cannot specify more complex topology than a feed-forward stack, but it's good enough for many use cases.
+
+In the final part of the assignment we are asked to train a model with whatever ConvNet architecture on CIFAR-10 and achieve at least 70\% accuracy on the CIFAR-10 validation set within 10 epochs.
+
+The default setting(3-layered convnet) achieves 50\% accuracy, so there is a long way to go. First I random search learning rate to find the optimal result. It turns out that setting learning rate to be 1.8e-3 will increase the accuracy to be 59.8\%. Then I insert batch normalization layers after each conv layer and stack more conv layers(6 conv layers in total), and all kernels have size $3\times 3$. At the same time I set every two conv layers striding 2 instead of 1 to perform as dropout. The final 7-layered convnet trained in 10 epochs easily achieves 74.86\% accuracy on validation set, outperforming the baseline by 4.86\%. The model also has 74.8\% accuracy on test set, showing that there is little overfitting problem.
 
 \section{Plans}
+In the next I will try to re-implement convnet exercise with TensorFlow since the TensorFlow exercise is also provided by the assignment 2 of cs231n course. And also I will continue the course.
 
 \end{document}
