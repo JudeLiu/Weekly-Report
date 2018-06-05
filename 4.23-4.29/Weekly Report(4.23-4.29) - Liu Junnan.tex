@@ -107,7 +107,7 @@ To further explain what happens, it is important to read and understand the rule
         \item they are equal, or
         \item one of them is 1
     \end{enumerate}
-\item Arrays do not need to have the same number of dimensions. When either of the dimensions compared is one, the other is used.  In other words, dimensions with size 1 are stretched or ¡°copied¡± to match the other.
+\item Arrays do not need to have the same number of dimensions. When either of the dimensions compared is one, the other is used.  In other words, dimensions with size 1 are stretched or copied to match the other.
 \end{itemize}
 
 Let check the rules. $P$ has shape (num\_test,), and we add brackets $[P]$ makes it a 2 dimensional array with shape (1, num\_test), and function np.transpose() transposes it yielding shape (num\_test, 1). Since $Q$ has shape (num\_train,), it matches the last dimension of the term np.transpose([P]), so the rule 1 of broadcasting is met; np.transpose([P]) has more dimensions than Q, so the rule 2 is met. Therefore the result finally has shape (num\_test, num\_train), which is the same as PQ, so they will do element-wise subtraction.
